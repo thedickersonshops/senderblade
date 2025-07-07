@@ -239,7 +239,123 @@ SenderBlade Security Team
     response.headers['Access-Control-Allow-Credentials'] = 'true'
     return response
 
-# Copy other routes from original auth_api
+@auth_api.route('/register', methods=['POST'])
+def register():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    email = data.get('email')
+    full_name = data.get('full_name', '')
+    phone = data.get('phone', '')
+    
+    if not username or not password:
+        return jsonify({'success': False, 'message': 'Username and password required'}), 400
+    
+    if not email:
+        return jsonify({'success': False, 'message': 'Email is required for OTP verification'}), 400
+    
+    # Check if user exists
+    existing = query_db('SELECT * FROM users WHERE username = ? OR email = ?', [username, email], one=True)
+    if existing:
+        return jsonify({'success': False, 'message': 'Username or email already exists'}), 400
+    
+    # Generate OTP
+    import random
+    otp_code = str(random.randint(100000, 999999))
+    
+    # Send OTP email
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        
+        smtp_server = "smtp.gmail.com"
+        smtp_port = 587
+        sender_email = "timothykeeton.tk@gmail.com"
+        sender_password = "akda bgpw becv kbso"
+        
+        subject = "SenderBlade - Email Verification Code"
+        body = f"""
+Welcome to SenderBlade, {username}!
+
+Your email verification code is: {otp_code}
+
+This code will expire in 10 minutes.
+
+If you didn't request this, please ignore this email.
+
+Best regards,
+SenderBlade Team
+        """
+        
+        msg = MIMEText(body)
+        msg['Subject'] = subject
+        msg['From'] = sender_email
+        msg['To'] = email
+        
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+        
+        print(f"OTP email sent successfully to {email}")
+        
+    except Exception as e:
+        print(f"OTP send error: {e}")
+        return jsonify({'success': False, 'message': f'Failed to send OTP email: {str(e)}'}), 500
+    
+    # Create user with pending status
+    hashed_password = hash_password(password)
+    import time
+    otp_expires = int(time.time()) + 600  # 10 minutes
+    
+    user_id = execute_db(
+        '''INSERT INTO users (username, password, email, full_name, phone, status, is_active, otp_code, otp_expires, created_at) 
+           VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?, datetime('now'))''',
+        (username, hashed_password, email, full_name, phone, otp_code, otp_expires)
+    )
+    
+    return jsonify({
+        'success': True, 
+        'message': 'Registration successful! Please check your email for OTP verification code.',
+        'requires_otp': True,
+        'user_id': user_id
+    })
+
+@auth_api.route('/verify-otp', methods=['POST'])
+def verify_otp():
+    data = request.json
+    user_id = data.get('user_id')
+    otp_code = data.get('otp_code')
+    
+    if not user_id or not otp_code:
+        return jsonify({'success': False, 'message': 'User ID and OTP code required'}), 400
+    
+    # Get user and verify OTP
+    user = query_db('SELECT * FROM users WHERE id = ?', [user_id], one=True)
+    if not user:
+        return jsonify({'success': False, 'message': 'User not found'}), 404
+    
+    import time
+    current_time = int(time.time())
+    
+    if user['otp_code'] != otp_code:
+        return jsonify({'success': False, 'message': 'Invalid OTP code'}), 400
+    
+    if current_time > user['otp_expires']:
+        return jsonify({'success': False, 'message': 'OTP code has expired. Please register again.'}), 400
+    
+    # Mark OTP as verified, but keep user pending for admin approval
+    execute_db(
+        'UPDATE users SET otp_verified = 1, otp_code = NULL, otp_expires = NULL WHERE id = ?',
+        (user_id,)
+    )
+    
+    return jsonify({
+        'success': True, 
+        'message': 'OTP verified successfully! Your account is now pending admin approval. You will be notified once approved.',
+        'status': 'pending_approval'
+    })
+
 @auth_api.route('/logout', methods=['POST'])
 def logout():
     session.clear()
