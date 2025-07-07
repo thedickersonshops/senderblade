@@ -43,6 +43,40 @@ def execute_db(query, args=()):
         print(f"Database execute error: {e}")
         return None
 
+def init_missing_columns():
+    """Add missing columns to users table"""
+    try:
+        conn = sqlite3.connect('sender.db')
+        cursor = conn.cursor()
+        
+        # Add missing columns if they don't exist
+        try:
+            cursor.execute('ALTER TABLE users ADD COLUMN otp_code TEXT')
+            print('Added otp_code column')
+        except:
+            pass
+            
+        try:
+            cursor.execute('ALTER TABLE users ADD COLUMN otp_expires INTEGER')
+            print('Added otp_expires column')
+        except:
+            pass
+            
+        try:
+            cursor.execute('ALTER TABLE users ADD COLUMN otp_verified INTEGER DEFAULT 0')
+            print('Added otp_verified column')
+        except:
+            pass
+            
+        conn.commit()
+        conn.close()
+        print('Database schema updated')
+    except Exception as e:
+        print(f'Schema update error: {e}')
+
+# Initialize missing columns on import
+init_missing_columns()
+
 def hash_password(password):
     salt = secrets.token_hex(16)
     hashed = hashlib.sha256((password + salt).encode()).hexdigest()
