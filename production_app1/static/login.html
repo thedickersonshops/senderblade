@@ -315,6 +315,8 @@
                     password 
                 });
                 
+                console.log('Registration result:', result);
+                
                 if (result.success) {
                     if (result.requires_otp) {
                         pendingUserId = result.user_id;
@@ -322,6 +324,7 @@
                         localStorage.setItem('pendingUserId', result.user_id);
                         localStorage.setItem('pendingUserEmail', email);
                         console.log('Stored pending user ID:', result.user_id);
+                        console.log('localStorage check:', localStorage.getItem('pendingUserId'));
                         showAlert('Registration successful! Please check your email for verification code.', 'success');
                         showOTPForm();
                     } else {

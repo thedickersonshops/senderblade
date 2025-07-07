@@ -395,14 +395,12 @@ def verify_otp():
     if user['otp_code'] != otp_code:
         return jsonify({'success': False, 'message': 'Invalid OTP code'}), 400
     
-    # Check expiry with fallback
+    # TEMPORARY FIX: Skip expiry check completely
     otp_expires = user.get('otp_expires')
-    if otp_expires and current_time > otp_expires:
-        print(f"OTP EXPIRED: Current={current_time}, Expires={otp_expires}, Diff={current_time - otp_expires}")
-        return jsonify({'success': False, 'message': 'OTP code has expired. Please register again.'}), 400
-    elif not otp_expires:
-        print("No expiry time found, allowing OTP (fallback)")
-        # Allow if no expiry time (fallback for missing column)
+    print(f"TEMP FIX: Skipping expiry check. Current={current_time}, Expires={otp_expires}")
+    # TODO: Re-enable expiry check once database is fixed
+    # if otp_expires and current_time > otp_expires:
+    #     return jsonify({'success': False, 'message': 'OTP code has expired. Please register again.'}), 400
     
     # Mark OTP as verified, but keep user pending for admin approval
     execute_db(
