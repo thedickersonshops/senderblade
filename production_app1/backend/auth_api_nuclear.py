@@ -344,26 +344,24 @@ SenderBlade Team
     
     print(f"REGISTRATION DEBUG: OTP={otp_code}, Expires={otp_expires}, Current={int(time.time())}")
     
-    # Try to create user with fallback for missing columns
+    # SIMPLE FALLBACK - Try basic insert first
     try:
         user_id = execute_db(
-            '''INSERT INTO users (username, password, email, full_name, phone, status, is_active, otp_code, otp_expires, created_at) 
-               VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?, datetime('now'))''',
-            (username, hashed_password, email, full_name, phone, otp_code, otp_expires)
+            '''INSERT INTO users (username, password, email, status, is_active, otp_code, created_at) 
+               VALUES (?, ?, ?, 'pending', 0, ?, datetime('now'))''',
+            (username, hashed_password, email, otp_code)
         )
+        print(f"USER CREATED: ID={user_id}")
+        
+        if not user_id:
+            print("ERROR: User ID is None after insert")
+            return jsonify({'success': False, 'message': 'Failed to create user account'}), 500
+            
     except Exception as db_error:
-        print(f"Database error, trying fallback: {db_error}")
-        # Fallback without otp_expires if column doesn't exist
-        user_id = execute_db(
-            '''INSERT INTO users (username, password, email, full_name, phone, status, is_active, otp_code, created_at) 
-               VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, datetime('now'))''',
-            (username, hashed_password, email, full_name, phone, otp_code)
-        )
-        # Store expiry separately if needed
-        try:
-            execute_db('UPDATE users SET otp_expires = ? WHERE id = ?', (otp_expires, user_id))
-        except:
-            print("Could not set otp_expires, using 10 minute default")
+        print(f"Database error: {db_error}")
+        return jsonify({'success': False, 'message': f'Database error: {str(db_error)}'}), 500
+    
+    print(f"RETURNING USER_ID: {user_id}")
     
     return jsonify({
         'success': True, 
