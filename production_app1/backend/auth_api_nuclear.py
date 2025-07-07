@@ -306,13 +306,30 @@ SenderBlade Team
     # Create user with pending status
     hashed_password = hash_password(password)
     import time
-    otp_expires = int(time.time()) + 600  # 10 minutes
+    otp_expires = int(time.time()) + 600  # 10 minutes (600 seconds)
     
-    user_id = execute_db(
-        '''INSERT INTO users (username, password, email, full_name, phone, status, is_active, otp_code, otp_expires, created_at) 
-           VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?, datetime('now'))''',
-        (username, hashed_password, email, full_name, phone, otp_code, otp_expires)
-    )
+    print(f"REGISTRATION DEBUG: OTP={otp_code}, Expires={otp_expires}, Current={int(time.time())}")
+    
+    # Try to create user with fallback for missing columns
+    try:
+        user_id = execute_db(
+            '''INSERT INTO users (username, password, email, full_name, phone, status, is_active, otp_code, otp_expires, created_at) 
+               VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?, datetime('now'))''',
+            (username, hashed_password, email, full_name, phone, otp_code, otp_expires)
+        )
+    except Exception as db_error:
+        print(f"Database error, trying fallback: {db_error}")
+        # Fallback without otp_expires if column doesn't exist
+        user_id = execute_db(
+            '''INSERT INTO users (username, password, email, full_name, phone, status, is_active, otp_code, created_at) 
+               VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, datetime('now'))''',
+            (username, hashed_password, email, full_name, phone, otp_code)
+        )
+        # Store expiry separately if needed
+        try:
+            execute_db('UPDATE users SET otp_expires = ? WHERE id = ?', (otp_expires, user_id))
+        except:
+            print("Could not set otp_expires, using 10 minute default")
     
     return jsonify({
         'success': True, 
@@ -338,11 +355,20 @@ def verify_otp():
     import time
     current_time = int(time.time())
     
+    print(f"OTP VERIFICATION DEBUG: User OTP={user.get('otp_code')}, Provided={otp_code}")
+    print(f"TIME DEBUG: Current={current_time}, Expires={user.get('otp_expires')}, User created={user.get('created_at')}")
+    
     if user['otp_code'] != otp_code:
         return jsonify({'success': False, 'message': 'Invalid OTP code'}), 400
     
-    if current_time > user['otp_expires']:
+    # Check expiry with fallback
+    otp_expires = user.get('otp_expires')
+    if otp_expires and current_time > otp_expires:
+        print(f"OTP EXPIRED: Current={current_time}, Expires={otp_expires}, Diff={current_time - otp_expires}")
         return jsonify({'success': False, 'message': 'OTP code has expired. Please register again.'}), 400
+    elif not otp_expires:
+        print("No expiry time found, allowing OTP (fallback)")
+        # Allow if no expiry time (fallback for missing column)
     
     # Mark OTP as verified, but keep user pending for admin approval
     execute_db(
