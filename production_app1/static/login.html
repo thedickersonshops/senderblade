@@ -318,6 +318,10 @@
                 if (result.success) {
                     if (result.requires_otp) {
                         pendingUserId = result.user_id;
+                        // Store in localStorage as backup
+                        localStorage.setItem('pendingUserId', result.user_id);
+                        localStorage.setItem('pendingUserEmail', email);
+                        console.log('Stored pending user ID:', result.user_id);
                         showAlert('Registration successful! Please check your email for verification code.', 'success');
                         showOTPForm();
                     } else {
@@ -340,7 +344,12 @@
             
             const otpCode = document.getElementById('otpCode').value;
             
-            if (!pendingUserId) {
+            // Try to get user ID from memory or localStorage
+            let userId = pendingUserId || localStorage.getItem('pendingUserId');
+            
+            console.log('OTP Verification - User ID:', userId, 'OTP:', otpCode);
+            
+            if (!userId) {
                 showAlert('Session expired. Please register again.', 'danger');
                 showRegisterForm();
                 return;
@@ -348,13 +357,15 @@
             
             try {
                 const result = await api('/verify-otp', 'POST', { 
-                    user_id: pendingUserId, 
+                    user_id: userId, 
                     otp_code: otpCode 
                 });
                 
                 if (result.success) {
                     showAlert('Email verified successfully! Your account is pending admin approval. You will be notified once approved.', 'success');
                     pendingUserId = null;
+                    localStorage.removeItem('pendingUserId');
+                    localStorage.removeItem('pendingUserEmail');
                     showLoginForm();
                 } else {
                     showAlert(result.message, 'danger');
