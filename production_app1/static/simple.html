@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Sender</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .sidebar { position: fixed; top: 0; bottom: 0; left: 0; z-index: 100; padding: 48px 0 0; box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1); height: 100vh; }
+        .sidebar .nav-link { font-weight: 500; color: #adb5bd; padding: 0.5rem 1rem; margin: 0.2rem 0; border-radius: 0.25rem; }
+        .sidebar .nav-link:hover { color: #fff; background-color: rgba(255, 255, 255, 0.1); }
+        .sidebar .nav-link.active { color: #fff; background-color: rgba(255, 255, 255, 0.2); }
+        main { padding-top: 1.5rem; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-dark sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <div class="text-center mb-4">
+                        <h3 class="text-white">Email Sender</h3>
+                    </div>
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="#" onclick="loadDashboard()">
+                                <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" onclick="loadLists()">
+                                <i class="fas fa-list me-2"></i> Lists
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" onclick="loadSmtp()">
+                                <i class="fas fa-server me-2"></i> SMTP Servers
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" onclick="loadProxies()">
+                                <i class="fas fa-shield-alt me-2"></i> Proxies
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" onclick="loadCampaigns()">
+                                <i class="fas fa-paper-plane me-2"></i> Campaigns
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 id="pageTitle">Dashboard</h1>
+                    <div id="pageActions"></div>
+                </div>
+
+                <div id="alertContainer"></div>
+                <div id="pageContent"></div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal fade" id="createListModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create Email List</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="listName" class="form-label">List Name</label>
+                        <input type="text" class="form-control" id="listName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="listDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="listDescription" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveList()">Create List</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="uploadContactsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Upload Contacts</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="contactsFile" class="form-label">CSV File</label>
+                        <input type="file" class="form-control" id="contactsFile" accept=".csv,.txt">
+                        <small class="form-text text-muted">Format: email,first_name,last_name</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Or Generate Random Emails</label>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <input type="number" class="form-control" id="randomCount" placeholder="Count" value="10">
+                            </div>
+                            <div class="col-md-4">
+                                <select class="form-select" id="randomType">
+                                    <option value="random">Random</option>
+                                    <option value="domain">Custom Domain</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <input type="text" class="form-control" id="customDomain" placeholder="domain.com">
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-secondary mt-2" onclick="generateRandomEmails()">Generate Random Emails</button>
+                    </div>
+                    <input type="hidden" id="uploadListId" value="">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="uploadContacts()">Upload</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="addSmtpModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add SMTP Server</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="smtpName" class="form-label">Server Name</label>
+                        <input type="text" class="form-control" id="smtpName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="smtpHost" class="form-label">Host</label>
+                        <input type="text" class="form-control" id="smtpHost" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="smtpPort" class="form-label">Port</label>
+                        <input type="number" class="form-control" id="smtpPort" required value="587">
+                    </div>
+                    <div class="mb-3">
+                        <label for="smtpUsername" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="smtpUsername" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="smtpPassword" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="smtpPassword" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="smtpFromEmail" class="form-label">From Email</label>
+                        <input type="email" class="form-control" id="smtpFromEmail" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="smtpFromName" class="form-label">From Name</label>
+                        <input type="text" class="form-control" id="smtpFromName">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="testSmtp()">Test Connection</button>
+                    <button type="button" class="btn btn-success" onclick="saveSmtp()">Save Server</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="addProxyModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Proxy</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="proxyHost" class="form-label">Host</label>
+                        <input type="text" class="form-control" id="proxyHost" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="proxyPort" class="form-label">Port</label>
+                        <input type="number" class="form-control" id="proxyPort" required value="1080">
+                    </div>
+                    <div class="mb-3">
+                        <label for="proxyType" class="form-label">Type</label>
+                        <select class="form-select" id="proxyType">
+                            <option value="http">HTTP</option>
+                            <option value="socks4">SOCKS4</option>
+                            <option value="socks5">SOCKS5</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="proxyUsername" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="proxyUsername">
+                    </div>
+                    <div class="mb-3">
+                        <label for="proxyPassword" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="proxyPassword">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="testProxy()">Test Connection</button>
+                    <button type="button" class="btn btn-success" onclick="saveProxy()">Save Proxy</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="createCampaignModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create Campaign</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="campaignName" class="form-label">Campaign Name</label>
+                        <input type="text" class="form-control" id="campaignName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="campaignList" class="form-label">Email List</label>
+                        <select class="form-select" id="campaignList" required>
+                            <option value="">Select a list...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="campaignSmtp" class="form-label">SMTP Server</label>
+                        <select class="form-select" id="campaignSmtp" required>
+                            <option value="">Select SMTP server...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="campaignSubject" class="form-label">Subject</label>
+                        <input type="text" class="form-control" id="campaignSubject" required placeholder="Use {first_name} for personalization">
+                    </div>
+                    <div class="mb-3">
+                        <label for="campaignBody" class="form-label">Message</label>
+                        <textarea class="form-control" id="campaignBody" rows="8" required placeholder="Use {first_name}, {last_name}, {email} for personalization"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveCampaign()">Create Campaign</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Simple API calls
+        async function api(endpoint, method = 'GET', data = null) {
+            const options = {
+                method,
+                headers: { 'Content-Type': 'application/json' }
+            };
+            if (data) options.body = JSON.stringify(data);
+            
+            const response = await fetch(`http://localhost:5001/api${endpoint}`, options);
+            return await response.json();
+        }
+
+        // Alert function
+        function showAlert(message, type = 'info') {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertElement = document.createElement('div');
+            alertElement.className = `alert alert-${type} alert-dismissible fade show`;
+            alertElement.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            alertContainer.appendChild(alertElement);
+            setTimeout(() => alertElement.remove(), 5000);
+        }
+
+        // Dashboard
+        async function loadDashboard() {
+            document.getElementById('pageTitle').textContent = 'Dashboard';
+            document.getElementById('pageActions').innerHTML = '';
+            
+            const lists = await api('/lists');
+            const smtp = await api('/smtp');
+            const proxies = await api('/proxies');
+            const campaigns = await api('/campaigns');
+            
+            document.getElementById('pageContent').innerHTML = `
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5>Email Lists</h5>
+                                <h2>${lists.data ? lists.data.length : 0}</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5>SMTP Servers</h5>
+                                <h2>${smtp.data ? smtp.data.length : 0}</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5>Proxies</h5>
+                                <h2>${proxies.data ? proxies.data.length : 0}</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5>Campaigns</h5>
+                                <h2>${campaigns.data ? campaigns.data.length : 0}</h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Lists
+        async function loadLists() {
+            document.getElementById('pageTitle').textContent = 'Email Lists';
+            document.getElementById('pageActions').innerHTML = '<button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createListModal">Create List</button>';
+            
+            const result = await api('/lists');
+            const lists = result.data || [];
+            
+            let html = '';
+            if (lists.length === 0) {
+                html = '<div class="alert alert-info">No lists found. Create your first list.</div>';
+            } else {
+                html = `
+                    <table class="table">
+                        <thead>
+                            <tr><th>Name</th><th>Contacts</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody>
+                            ${lists.map(list => `
+                                <tr>
+                                    <td>${list.name}</td>
+                                    <td>${list.contact_count}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary" onclick="viewList(${list.id})">View</button>
+                                        <button class="btn btn-sm btn-danger" onclick="deleteList(${list.id})">Delete</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+            document.getElementById('pageContent').innerHTML = html;
+        }
+
+        async function saveList() {
+            const name = document.getElementById('listName').value;
+            const description = document.getElementById('listDescription').value;
+            
+            if (!name) {
+                showAlert('Please enter a list name', 'danger');
+                return;
+            }
+            
+            const result = await api('/lists', 'POST', { name, description });
+            
+            if (result.success) {
+                showAlert('List created successfully', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('createListModal')).hide();
+                loadLists();
+            } else {
+                showAlert(result.message, 'danger');
+            }
+        }
+
+        async function viewList(listId) {
+            const list = await api(`/lists/${listId}`);
+            const contacts = await api(`/lists/${listId}/contacts`);
+            
+            document.getElementById('pageTitle').textContent = list.data.name;
+            document.getElementById('pageActions').innerHTML = `
+                <button class="btn btn-primary" onclick="showUploadModal(${listId})">Upload Contacts</button>
+            `;
+            
+            let html = `<h5>Contacts (${list.data.contact_count})</h5>`;
+            
+            if (contacts.data && contacts.data.length > 0) {
+                html += `
+                    <table class="table">
+                        <thead>
+                            <tr><th>Email</th><th>First Name</th><th>Last Name</th></tr>
+                        </thead>
+                        <tbody>
+                            ${contacts.data.map(contact => `
+                                <tr>
+                                    <td>${contact.email}</td>
+                                    <td>${contact.first_name || '-'}</td>
+                                    <td>${contact.last_name || '-'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                html += '<div class="alert alert-info">No contacts found. Upload contacts to get started.</div>';
+            }
+            
+            document.getElementById('pageContent').innerHTML = html;
+        }
+
+        function showUploadModal(listId) {
+            document.getElementById('uploadListId').value = listId;
+            new bootstrap.Modal(document.getElementById('uploadContactsModal')).show();
+        }
+
+        async function generateRandomEmails() {
+            const count = document.getElementById('randomCount').value;
+            const type = document.getElementById('randomType').value;
+            const domain = document.getElementById('customDomain').value;
+            const listId = document.getElementById('uploadListId').value;
+            
+            if (!count || count < 1) {
+                showAlert('Please enter a valid count', 'danger');
+                return;
+            }
+            
+            if (type === 'domain' && !domain) {
+                showAlert('Please enter a custom domain', 'danger');
+                return;
+            }
+            
+            const result = await api('/generate/emails', 'POST', { count: parseInt(count), type, domain });
+            
+            if (result.success) {
+                const addResult = await api(`/lists/${listId}/contacts`, 'POST', { contacts: result.data });
+                
+                if (addResult.success) {
+                    showAlert(`${addResult.added_count} random emails generated and added successfully`, 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('uploadContactsModal')).hide();
+                    viewList(listId);
+                } else {
+                    showAlert(addResult.message, 'danger');
+                }
+            } else {
+                showAlert(result.message, 'danger');
+            }
+        }
+
+        async function uploadContacts() {
+            const listId = document.getElementById('uploadListId').value;
+            const fileInput = document.getElementById('contactsFile');
+            
+            if (!fileInput.files[0]) {
+                showAlert('Please select a file or generate random emails', 'danger');
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = async function(e) {
+                const content = e.target.result;
+                const lines = content.split('\n').filter(line => line.trim());
+                const contacts = [];
+                
+                lines.forEach(line => {
+                    const parts = line.split(',');
+                    const email = parts[0]?.trim();
+                    if (email && email.includes('@')) {
+                        contacts.push({
+                            email: email,
+                            first_name: parts[1]?.trim() || '',
+                            last_name: parts[2]?.trim() || ''
+                        });
+                    }
+                });
+                
+                if (contacts.length === 0) {
+                    showAlert('No valid contacts found', 'danger');
+                    return;
+                }
+                
+                const result = await api(`/lists/${listId}/contacts`, 'POST', { contacts });
+                
+                if (result.success) {
+                    showAlert(`${result.added_count} contacts added successfully`, 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('uploadContactsModal')).hide();
+                    viewList(listId);
+                } else {
+                    showAlert(result.message, 'danger');
+                }
+            };
+            
+            reader.readAsText(file);
+        }
+
+        async function deleteList(listId) {
+            if (!confirm('Are you sure you want to delete this list?')) return;
+            
+            const result = await api(`/lists/${listId}`, 'DELETE');
+            
+            if (result.success) {
+                showAlert('List deleted successfully', 'success');
+                loadLists();
+            } else {
+                showAlert(result.message, 'danger');
+            }
+        }
+
+        // SMTP
+        async function loadSmtp() {
+            document.getElementById('pageTitle').textContent = 'SMTP Servers';
+            document.getElementById('pageActions').innerHTML = '<button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSmtpModal">Add SMTP Server</button>';
+            
+            const result = await api('/smtp');
+            const servers = result.data || [];
+            
+            let html = '';
+            if (servers.length === 0) {
+                html = '<div class="alert alert-info">No SMTP servers found. Add your first server.</div>';
+            } else {
+                html = `
+                    <table class="table">
+                        <thead>
+                            <tr><th>Name</th><th>Host</th><th>Username</th><th>From Email</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody>
+                            ${servers.map(server => `
+                                <tr>
+                                    <td>${server.name}</td>
+                                    <td>${server.host}:${server.port}</td>
+                                    <td>${server.username}</td>
+                                    <td>${server.from_email}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-danger" onclick="deleteSmtp(${server.id})">Delete</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+            document.getElementById('pageContent').innerHTML = html;
+        }
+
+        async function testSmtp() {
+            const host = document.getElementById('smtpHost').value;
+            const port = document.getElementById('smtpPort').value;
+            const username = document.getElementById('smtpUsername').value;
+            const password = document.getElementById('smtpPassword').value;
+            
+            if (!host || !port || !username || !password) {
+                showAlert('Please fill in all required fields', 'danger');
+                return;
+            }
+            
+            const result = await api('/smtp/test', 'POST', { host, port, username, password });
+            
+            if (result.success) {
+                showAlert('SMTP connection successful', 'success');
+            } else {
+                showAlert(result.message, 'danger');
+            }
+        }
+
+        async function saveSmtp() {
+            const name = document.getElementById('smtpName').value;
+            const host = document.getElementById('smtpHost').value;
+            const port = document.getElementById('smtpPort').value;
+            const username = document.getElementById('smtpUsername').value;
+            const password = document.getElementById('smtpPassword').value;
+            const from_email = document.getElementById('smtpFromEmail').value;
+            const from_name = document.getElementById('smtpFromName').value;
+            
+            if (!name || !host || !port || !username || !password || !from_email) {
+                showAlert('Please fill in all required fields', 'danger');
+                return;
+            }
+            
+            const result = await api('/smtp', 'POST', {
+                name, host, port: parseInt(port), username, password, from_email, from_name
+            });
+            
+            if (result.success) {
+                showAlert('SMTP server added successfully', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('addSmtpModal')).hide();
+                loadSmtp();
+            } else {
+                showAlert(result.message, 'danger');
+            }
+        }
+
+        async function deleteSmtp(serverId) {
+            if (!confirm('Are you sure you want to delete this SMTP server?')) return;
+            
+            const result = await api(`/smtp/${serverId}`, 'DELETE');
+            
+            if (result.success) {
+                showAlert('SMTP server deleted successfully', 'success');
+                loadSmtp();
+            } else {
+                showAlert(result.message, 'danger');
+            }
+        }
+
+        // Proxies
+        async function loadProxies() {
+            document.getElementById('pageTitle').textContent = 'Proxies';
+            document.getElementById('pageActions').innerHTML = '<button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProxyModal">Add Proxy</button>';
+            
+            const result = await api('/proxies');
+            const proxies = result.data || [];
+            
+            let html = '';
+            if (proxies.length === 0) {
+                html = '<div class="alert alert-info">No proxies found. Add your first proxy.</div>';
+            } else {
+                html = `
+                    <table class="table">
+                        <thead>
+                            <tr><th>Host</th><th>Port</th><th>Type</th><th>Username</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody>
+                            ${proxies.map(proxy => `
+                                <tr>
+                                    <td>${proxy.host}</td>
+                                    <td>${proxy.port}</td>
+                                    <td>${proxy.proxy_type}</td>
+                                    <td>${proxy.username || '-'}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-danger" onclick="deleteProxy(${proxy.id})">Delete</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+            document.getElementById('pageContent').innerHTML = html;
+        }
+
+        async function testProxy() {
+            const host = document.getElementById('proxyHost').value;
+            const port = document.getElementById('proxyPort').value;
+            const username = document.getElementById('proxyUsername').value;
+            const password = document.getElementById('proxyPassword').value;
+            const proxy_type = document.getElementById('proxyType').value;
+            
+            if (!host || !port) {
+                showAlert('Host and port are required', 'danger');
+                return;
+            }
+            
+            const result = await api('/proxy/test', 'POST', { host, port, username, password, proxy_type });
+            
+            if (result.success) {
+                showAlert(`Proxy connection successful. Your IP: ${result.data.ip}`, 'success');
+            } else {
+                showAlert(result.message, 'danger');
+            }
+        }
+
+        async function saveProxy() {
+            const host = document.getElementById('proxyHost').value;
+            const port = document.getElementById('proxyPort').value;
+            const username = document.getElementById('proxyUsername').value;
+            const password = document.getElementById('proxyPassword').value;
+            const proxy_type = document.getElementById('proxyType').value;
+            
+            if (!host || !port) {
+                showAlert('Host and port are required', 'danger');
+                return;
+            }
+            
+            const result = await api('/proxies', 'POST', {
+                host, port: parseInt(port), username, password, proxy_type
+            });
+            
+            if (result.success) {
+                showAlert('Proxy added successfully', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('addProxyModal')).hide();
+                loadProxies();
+            } else {
+                showAlert(result.message, 'danger');
+            }
+        }
+
+        async function deleteProxy(proxyId) {
+            if (!confirm('Are you sure you want to delete this proxy?')) return;
+            
+            const result = await api(`/proxies/${proxyId}`, 'DELETE');
+            
+            if (result.success) {
+                showAlert('Proxy deleted successfully', 'success');
+                loadProxies();
+            } else {
+                showAlert(result.message, 'danger');
+            }
+        }
+
+        // Campaigns
+        async function loadCampaigns() {
+            document.getElementById('pageTitle').textContent = 'Campaigns';
+            document.getElementById('pageActions').innerHTML = '<button class="btn btn-primary" onclick="showCreateCampaignModal()">Create Campaign</button>';
+            
+            const result = await api('/campaigns');
+            const campaigns = result.data || [];
+            
+            let html = '';
+            if (campaigns.length === 0) {
+                html = '<div class="alert alert-info">No campaigns found. Create your first campaign.</div>';
+            } else {
+                html = `
+                    <table class="table">
+                        <thead>
+                            <tr><th>Name</th><th>List</th><th>SMTP</th><th>Status</th><th>Progress</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody>
+                            ${campaigns.map(campaign => `
+                                <tr>
+                                    <td>${campaign.name}</td>
+                                    <td>${campaign.list_name}</td>
+                                    <td>${campaign.smtp_name}</td>
+                                    <td><span class="badge bg-${getStatusColor(campaign.status)}">${campaign.status}</span></td>
+                                    <td>${campaign.sent_emails}/${campaign.total_emails}</td>
+                                    <td>
+                                        ${campaign.status === 'draft' ? `<button class="btn btn-sm btn-success" onclick="sendCampaign(${campaign.id})">Send</button>` : ''}
+                                        <button class="btn btn-sm btn-danger" onclick="deleteCampaign(${campaign.id})">Delete</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+            document.getElementById('pageContent').innerHTML = html;
+        }
+
+        function getStatusColor(status) {
+            switch(status) {
+                case 'draft': return 'secondary';
+                case 'sending': return 'warning';
+                case 'completed': return 'success';
+                case 'failed': return 'danger';
+                default: return 'secondary';
+            }
+        }
+
+        async function showCreateCampaignModal() {
+            // Load lists and SMTP servers
+            const lists = await api('/lists');
+            const smtp = await api('/smtp');
+            
+            // Populate dropdowns
+            const listSelect = document.getElementById('campaignList');
+            listSelect.innerHTML = '<option value="">Select a list...</option>';
+            if (lists.data) {
+                lists.data.forEach(list => {
+                    listSelect.innerHTML += `<option value="${list.id}">${list.name} (${list.contact_count} contacts)</option>`;
+                });
+            }
+            
+            const smtpSelect = document.getElementById('campaignSmtp');
+            smtpSelect.innerHTML = '<option value="">Select SMTP server...</option>';
+            if (smtp.data) {
+                smtp.data.forEach(server => {
+                    smtpSelect.innerHTML += `<option value="${server.id}">${server.name} (${server.from_email})</option>`;
+                });
+            }
+            
+            new bootstrap.Modal(document.getElementById('createCampaignModal')).show();
+        }
+
+        async function saveCampaign() {
+            const name = document.getElementById('campaignName').value;
+            const list_id = document.getElementById('campaignList').value;
+            const smtp_id = document.getElementById('campaignSmtp').value;
+            const subject = document.getElementById('campaignSubject').value;
+            const body = document.getElementById('campaignBody').value;
+            
+            if (!name || !list_id || !smtp_id || !subject || !body) {
+                showAlert('Please fill in all required fields', 'danger');
+                return;
+            }
+            
+            const result = await api('/campaigns', 'POST', {
+                name, list_id: parseInt(list_id), smtp_id: parseInt(smtp_id), subject, body
+            });
+            
+            if (result.success) {
+                showAlert('Campaign created successfully', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('createCampaignModal')).hide();
+                loadCampaigns();
+            } else {
+                showAlert(result.message, 'danger');
+            }
+        }
+
+        async function sendCampaign(campaignId) {
+            if (!confirm('Are you sure you want to send this campaign? This cannot be undone.')) return;
+            
+            showAlert('Campaign is being sent...', 'info');
+            
+            const result = await api(`/campaigns/${campaignId}/send`, 'POST');
+            
+            if (result.success) {
+                showAlert(result.message, 'success');
+                loadCampaigns();
+            } else {
+                showAlert(result.message, 'danger');
+            }
+        }
+
+        async function deleteCampaign(campaignId) {
+            if (!confirm('Are you sure you want to delete this campaign?')) return;
+            
+            const result = await api(`/campaigns/${campaignId}`, 'DELETE');
+            
+            if (result.success) {
+                showAlert('Campaign deleted successfully', 'success');
+                loadCampaigns();
+            } else {
+                showAlert(result.message, 'danger');
+            }
+        }
+
+        // Load dashboard on page load
+        document.addEventListener('DOMContentLoaded', loadDashboard);
+    </script>
+</body>
+</html>
