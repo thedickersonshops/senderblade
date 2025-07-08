@@ -312,16 +312,16 @@ def register():
         # Send OTP email
         print("Sending OTP email...")
         try:
-        import smtplib
-        from email.mime.text import MIMEText
+            import smtplib
+            from email.mime.text import MIMEText
         
-        smtp_server = "smtp.gmail.com"
-        smtp_port = 587
-        sender_email = "timothykeeton.tk@gmail.com"
-        sender_password = "akda bgpw becv kbso"
-        
-        subject = "SenderBlade - Email Verification Code"
-        body = f"""
+            smtp_server = "smtp.gmail.com"
+            smtp_port = 587
+            sender_email = "timothykeeton.tk@gmail.com"
+            sender_password = "akda bgpw becv kbso"
+            
+            subject = "SenderBlade - Email Verification Code"
+            body = f"""
 Welcome to SenderBlade, {username}!
 
 Your email verification code is: {otp_code}
@@ -332,18 +332,18 @@ If you didn't request this, please ignore this email.
 
 Best regards,
 SenderBlade Team
-        """
-        
-        msg = MIMEText(body)
-        msg['Subject'] = subject
-        msg['From'] = sender_email
-        msg['To'] = email
-        
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(sender_email, sender_password)
-            server.send_message(msg)
-        
+            """
+            
+            msg = MIMEText(body)
+            msg['Subject'] = subject
+            msg['From'] = sender_email
+            msg['To'] = email
+            
+            with smtplib.SMTP(smtp_server, smtp_port) as server:
+                server.starttls()
+                server.login(sender_email, sender_password)
+                server.send_message(msg)
+            
             print(f"OTP email sent successfully to {email}")
             
         except Exception as e:
