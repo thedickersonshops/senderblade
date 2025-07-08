@@ -275,30 +275,43 @@ SenderBlade Security Team
 
 @auth_api.route('/register', methods=['POST'])
 def register():
-    data = request.json
-    username = data.get('username')
-    password = data.get('password')
-    email = data.get('email')
-    full_name = data.get('full_name', '')
-    phone = data.get('phone', '')
-    
-    if not username or not password:
-        return jsonify({'success': False, 'message': 'Username and password required'}), 400
-    
-    if not email:
-        return jsonify({'success': False, 'message': 'Email is required for OTP verification'}), 400
-    
-    # Check if user exists
-    existing = query_db('SELECT * FROM users WHERE username = ? OR email = ?', [username, email], one=True)
-    if existing:
-        return jsonify({'success': False, 'message': 'Username or email already exists'}), 400
-    
-    # Generate OTP
-    import random
-    otp_code = str(random.randint(100000, 999999))
-    
-    # Send OTP email
     try:
+        print("\n=== REGISTRATION ATTEMPT START ===")
+        data = request.json
+        print(f"Request data: {data}")
+        
+        username = data.get('username')
+        password = data.get('password')
+        email = data.get('email')
+        full_name = data.get('full_name', '')
+        phone = data.get('phone', '')
+        
+        print(f"Parsed data: username={username}, email={email}")
+    
+        if not username or not password:
+            print("ERROR: Missing username or password")
+            return jsonify({'success': False, 'message': 'Username and password required'}), 400
+        
+        if not email:
+            print("ERROR: Missing email")
+            return jsonify({'success': False, 'message': 'Email is required for OTP verification'}), 400
+    
+        # Check if user exists
+        print("Checking for existing user...")
+        existing = query_db('SELECT * FROM users WHERE username = ? OR email = ?', [username, email], one=True)
+        if existing:
+            print(f"User already exists: {existing}")
+            return jsonify({'success': False, 'message': 'Username or email already exists'}), 400
+    
+        # Generate OTP
+        print("Generating OTP...")
+        import random
+        otp_code = str(random.randint(100000, 999999))
+        print(f"Generated OTP: {otp_code}")
+    
+        # Send OTP email
+        print("Sending OTP email...")
+        try:
         import smtplib
         from email.mime.text import MIMEText
         
@@ -331,44 +344,59 @@ SenderBlade Team
             server.login(sender_email, sender_password)
             server.send_message(msg)
         
-        print(f"OTP email sent successfully to {email}")
+            print(f"OTP email sent successfully to {email}")
+            
+        except Exception as e:
+            print(f"OTP send error: {e}")
+            return jsonify({'success': False, 'message': f'Failed to send OTP email: {str(e)}'}), 500
+    
+        # Create user with pending status
+        print("Creating user account...")
+        hashed_password = hash_password(password)
+        import time
+        otp_expires = int(time.time()) + 600  # 10 minutes (600 seconds)
+        
+        print(f"REGISTRATION DEBUG: OTP={otp_code}, Expires={otp_expires}, Current={int(time.time())}")
+        
+        # SIMPLE FALLBACK - Try basic insert first
+        try:
+            user_id = execute_db(
+                '''INSERT INTO users (username, password, email, status, is_active, otp_code, created_at) 
+                   VALUES (?, ?, ?, 'pending', 0, ?, datetime('now'))''',
+                (username, hashed_password, email, otp_code)
+            )
+            print(f"USER CREATED: ID={user_id}")
+            
+            if not user_id:
+                print("ERROR: User ID is None after insert")
+                return jsonify({'success': False, 'message': 'Failed to create user account'}), 500
+                
+        except Exception as db_error:
+            print(f"Database error: {db_error}")
+            return jsonify({'success': False, 'message': f'Database error: {str(db_error)}'}), 500
+        
+        print(f"RETURNING USER_ID: {user_id}")
+        print("=== REGISTRATION ATTEMPT SUCCESS ===")
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Registration successful! Please check your email for OTP verification code.',
+            'requires_otp': True,
+            'user_id': user_id
+        })
         
     except Exception as e:
-        print(f"OTP send error: {e}")
-        return jsonify({'success': False, 'message': f'Failed to send OTP email: {str(e)}'}), 500
-    
-    # Create user with pending status
-    hashed_password = hash_password(password)
-    import time
-    otp_expires = int(time.time()) + 600  # 10 minutes (600 seconds)
-    
-    print(f"REGISTRATION DEBUG: OTP={otp_code}, Expires={otp_expires}, Current={int(time.time())}")
-    
-    # SIMPLE FALLBACK - Try basic insert first
-    try:
-        user_id = execute_db(
-            '''INSERT INTO users (username, password, email, status, is_active, otp_code, created_at) 
-               VALUES (?, ?, ?, 'pending', 0, ?, datetime('now'))''',
-            (username, hashed_password, email, otp_code)
-        )
-        print(f"USER CREATED: ID={user_id}")
+        print(f"\n=== REGISTRATION CRITICAL ERROR ===")
+        print(f"Error type: {type(e).__name__}")
+        print(f"Error message: {str(e)}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        print("=== END REGISTRATION ERROR ===")
         
-        if not user_id:
-            print("ERROR: User ID is None after insert")
-            return jsonify({'success': False, 'message': 'Failed to create user account'}), 500
-            
-    except Exception as db_error:
-        print(f"Database error: {db_error}")
-        return jsonify({'success': False, 'message': f'Database error: {str(db_error)}'}), 500
-    
-    print(f"RETURNING USER_ID: {user_id}")
-    
-    return jsonify({
-        'success': True, 
-        'message': 'Registration successful! Please check your email for OTP verification code.',
-        'requires_otp': True,
-        'user_id': user_id
-    })
+        return jsonify({
+            'success': False, 
+            'message': f'Registration failed: {str(e)}'
+        }), 500
 
 @auth_api.route('/verify-otp', methods=['POST'])
 def verify_otp():
