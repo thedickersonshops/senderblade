@@ -445,6 +445,19 @@ def logout():
     session.clear()
     return jsonify({'success': True, 'message': 'Logged out successfully'})
 
+@auth_api.route('/test-nuclear', methods=['GET'])
+def test_nuclear():
+    """Test endpoint to verify nuclear auth API is active"""
+    print("\n=== NUCLEAR AUTH API TEST ===")
+    print("Nuclear auth API is ACTIVE and responding!")
+    print("=== END TEST ===")
+    return jsonify({
+        'success': True,
+        'message': 'Nuclear Auth API is ACTIVE!',
+        'version': 'nuclear_v1.0',
+        'endpoints': ['login', 'register', 'verify-otp', 'logout', 'me']
+    })
+
 @auth_api.route('/me', methods=['GET'])
 def get_current_user():
     if 'user_id' not in session:
